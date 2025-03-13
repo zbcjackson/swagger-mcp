@@ -13,6 +13,15 @@ A server that ingests and serves Swagger/OpenAPI specifications through the Mode
 - Automatically generates MCP tools from API endpoints
 - Server-Sent Events (SSE) support for real-time communication
 - TypeScript support
+
+## Security
+
+This is a personal server!! Do not expose it to the public internet.
+If the underlying API requires authentication, you should not expose the MCP server to the public internet.
+
+## TODO
+
+- secrets - the MCP server should be able to use secrets from the user to authenticate requests to the API
 - Comprehensive test suite
 
 ## Prerequisites
@@ -104,11 +113,6 @@ yarn test:watch
 # Run tests with coverage report
 yarn test:coverage
 ```
-
-## Security
-
-Please note this server is not intended to be used in production. It is a simple implementation for development purposes.
-If you add authentication to your API, you should not expose the MCP server to the public internet.
 
 ## Authentication
 
