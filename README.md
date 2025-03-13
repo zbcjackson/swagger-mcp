@@ -105,6 +105,11 @@ yarn test:watch
 yarn test:coverage
 ```
 
+## Security
+
+Please note this server is not intended to be used in production. It is a simple implementation for development purposes.
+If you add authentication to your API, you should not expose the MCP server to the public internet.
+
 ## Authentication
 
 The server supports various authentication methods. Configure them in the `config.json` file as fallbacks when not specified in the Swagger file:
@@ -159,7 +164,7 @@ The server supports various authentication methods. Configure them in the `confi
 yarn dev
 ```
 
-2. Make changes to the code
+<!-- 2. Make changes to the code
 
 3. Run tests to ensure everything works:
 ```bash
@@ -169,19 +174,19 @@ yarn test
 4. Build the project:
 ```bash
 yarn build
-```
+``` -->
 
-## Contributing
+<!-- ## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+5. Open a Pull Request -->
 
 ## License
 
-This project is licensed under the ISC License.
+This project is licensed under the Apache 2.0 License.
 
 ## Environment Variables
 
