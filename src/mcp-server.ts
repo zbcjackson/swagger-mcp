@@ -17,7 +17,7 @@ export class SwaggerMcpServer {
   private securitySchemes: Record<string, SecurityScheme> = {};
 
   constructor(apiBaseUrl: string, defaultAuth?: AuthConfig) {
-    console.log('constructor', apiBaseUrl, defaultAuth);
+    console.debug('constructor', apiBaseUrl, defaultAuth);
     this.apiBaseUrl = apiBaseUrl;
     this.defaultAuth = defaultAuth;
     this.mcpServer = new McpServer({
@@ -169,7 +169,7 @@ export class SwaggerMcpServer {
   }
 
   async loadSwaggerSpec(specUrlOrFile: string) {
-    console.log('loadSwaggerSpec', specUrlOrFile);
+    console.debug('Loading Swagger specification from:', specUrlOrFile);
     try {
       // Add auth headers for fetching the swagger spec if needed
       const headers = this.getAuthHeaders();
@@ -178,9 +178,15 @@ export class SwaggerMcpServer {
       }) as OpenAPI.Document;
       
       const info = this.swaggerSpec.info;
+      console.debug('Loaded Swagger spec:', {
+        title: info.title,
+        version: info.version,
+        description: info.description?.substring(0, 100) + '...'
+      });
       
       // Extract security schemes
       this.extractSecuritySchemes();
+      console.debug('Security schemes found:', Object.keys(this.securitySchemes));
       
       // Update server name with API info
       this.mcpServer = new McpServer({
@@ -225,18 +231,23 @@ export class SwaggerMcpServer {
   }
 
   private async registerTools() {
-    console.log('registerTools');
-    if (!this.swaggerSpec || !this.swaggerSpec.paths) return;
+    console.debug('Starting tool registration process');
+    if (!this.swaggerSpec || !this.swaggerSpec.paths) {
+      console.warn('No paths found in Swagger spec');
+      return;
+    }
+
+    const totalPaths = Object.keys(this.swaggerSpec.paths).length;
+    console.debug(`Found ${totalPaths} paths to process`);
 
     for (const [path, pathItem] of Object.entries(this.swaggerSpec.paths)) {
       if (!pathItem) continue;
       for (const [method, operation] of Object.entries(pathItem)) {
-        console.log('processing path', method.toUpperCase(), path);
         if (method === '$ref' || !operation) continue;
 
         const op = operation as OpenAPI.Operation;
         const operationId = op.operationId || `${method}-${path}`;
-        const description = `${op.summary || `${method.toUpperCase()} ${path}`}\n\n${op.description || ''}`;
+        console.log(`Register endpoint: ${method.toUpperCase()} ${path} (${operationId})`);
 
         // Create input schema based on parameters
         const inputShape: { [key: string]: z.ZodType<any> } = {};
@@ -252,19 +263,26 @@ export class SwaggerMcpServer {
           }
         });
 
-        console.log('registering tool', operationId);
+        console.debug(`Registering tool: ${operationId}`, {
+          parameters: Object.keys(inputShape),
+          hasAuth: !!inputShape['auth']
+        });
+
         // Register the tool
         this.mcpServer.tool(
           operationId,
-          description,
+          `${op.summary || `${method.toUpperCase()} ${path}`}\n\n${op.description || ''}`,
           {
             input: z.object(inputShape),
           },
           async ({ input }) => {
-            console.log('callTool', input);
+            console.debug(`Tool called: ${operationId}`, {
+              params: Object.keys(input).filter(k => k !== 'auth'),
+              hasAuth: !!input.auth
+            });
             try {
               const { auth, ...params } = input as ToolInput;
-              console.log('params', params);
+              console.debug('params', params);
               let url = this.apiBaseUrl + path;
               
               // Separate path parameters from query parameters
@@ -292,11 +310,11 @@ export class SwaggerMcpServer {
               const headers = this.getAuthHeaders(auth, op);
               const queryParams = this.getAuthQueryParams(auth);
 
-              console.log('url', url);
-              console.log('method', method);
-              console.log('headers', headers);
-              console.log('params', params);
-              console.log('queryParams', queryParams);
+              console.debug('url', url);
+              console.debug('method', method);
+              console.debug('headers', headers);
+              console.debug('params', params);
+              console.debug('queryParams', queryParams);
               
               const response = await axios({
                 method: method as string,
@@ -317,8 +335,8 @@ export class SwaggerMcpServer {
                   return searchParams.toString();
                 }
               });
-              console.log('response.headers', response.headers);
-              console.log('response.data', response.data);
+              console.debug('response.headers', response.headers);
+              console.debug('response.data', response.data);
 
               return {
                 content: [
@@ -353,13 +371,13 @@ export class SwaggerMcpServer {
   }
 
   handleSSE(res: Response) {
-    console.log('MCP handleSSE');
+    console.debug('MCP handleSSE');
     transport = new SSEServerTransport("/messages", res);
     this.mcpServer.connect(transport);
   }
 
   handleMessage(req: Request, res: Response) {
-    console.log('MCP handleMessage', req.body);
+    console.debug('MCP handleMessage', req.body);
     if (transport) {
       try {
         transport.handlePostMessage(req, res);
@@ -367,7 +385,7 @@ export class SwaggerMcpServer {
         console.error('Error handling message:', error);
       }
     } else {
-      console.log('no transport');
+      console.warn('no transport');
     }
   }
 }

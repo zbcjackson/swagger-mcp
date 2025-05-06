@@ -17,19 +17,24 @@ let mcpServer: SwaggerMcpServer | null = null;
 
 // Routes
 const handleSSE = async (req: Request, res: Response) => {
-  console.log('handleSSE');
+  console.debug('SSE connection request received');
   if (!mcpServer) {
-    console.log('mcpServer not initialized');
+    console.warn('MCP server not initialized - rejecting SSE connection');
     res.status(400).json({ error: 'MCP server not initialized' });
     return;
   }
+  console.debug('Establishing SSE connection...');
   mcpServer.handleSSE(res);
 };
 
 const handleMessage = async (req: Request, res: Response) => {
-  console.log('handleMessage', req.body);
+  console.debug('Message received:', {
+    method: req.method,
+    path: req.path,
+    body: req.body
+  });
   if (!mcpServer) {
-    console.log('mcpServer not initialized');
+    console.warn('MCP server not initialized - rejecting message');
     res.status(400).json({ error: 'MCP server not initialized' });
     return;
   }
@@ -37,6 +42,7 @@ const handleMessage = async (req: Request, res: Response) => {
 };
 
 const handleHealth = (_req: Request, res: Response) => {
+  console.debug('Health check request received');
   res.json({ 
     status: 'ok',
     mcpServer: mcpServer ? 'initialized' : 'not initialized'
@@ -58,15 +64,30 @@ app.get('/health', handleHealth);
 // Initialize server
 async function initializeServer() {
   try {
+    console.log('Starting server initialization...');
+    
     // Load configuration
     const config = await loadConfig();
+    // set app logging level
+    process.env.LOG_LEVEL = config.log?.level || 'info';
+
+    console.debug('Configuration loaded:', {
+      swaggerUrl: config.swagger.url,
+      apiBaseUrl: config.swagger.apiBaseUrl,
+      hasDefaultAuth: !!config.swagger.defaultAuth
+    });
     
     // Create and initialize MCP server
+    console.log('Creating MCP server instance...');
     mcpServer = new SwaggerMcpServer(config.swagger.apiBaseUrl, config.swagger.defaultAuth);
+    
+    console.log('Loading Swagger specification...');
     await mcpServer.loadSwaggerSpec(config.swagger.url);
+    console.debug('Swagger specification loaded successfully');
     
     // Start the server
     app.listen(config.server.port, config.server.host, () => {
+      console.log('Server initialization complete');
       console.log(`Server is running on http://${config.server.host}:${config.server.port}`);
       console.log('Swagger specification loaded from:', config.swagger.url);
       console.log('API Base URL:', config.swagger.apiBaseUrl);

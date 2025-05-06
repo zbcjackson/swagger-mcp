@@ -17,6 +17,9 @@ export const ConfigSchema = z.object({
       apiKeyIn: z.enum(['header', 'query']).optional(),
     }).optional(),
   }),
+  log: z.object({
+    level: z.enum(['debug', 'info', 'warn', 'error']),
+  }),
   server: z.object({
     port: z.number().default(3000),
     host: z.string().default('0.0.0.0'),
@@ -35,6 +38,9 @@ const defaultConfig: Config = {
       apiKeyName: 'api_key',
       apiKeyIn: 'header',
     },
+  },
+  log: {
+    level: 'info',
   },
   server: {
     port: 3000,
