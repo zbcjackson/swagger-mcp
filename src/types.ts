@@ -6,13 +6,13 @@ export interface SwaggerConfig {
 }
 
 export interface AuthConfig {
-  type: 'basic' | 'bearer' | 'apiKey' | 'oauth2';
+  type: 'basic' | 'bearer' | 'apiKey' | 'oauth2' | 'cookie';
   username?: string;
   password?: string;
   token?: string;
   apiKey?: string;
   apiKeyName?: string;
-  apiKeyIn?: 'header' | 'query';
+  apiKeyIn?: 'header' | 'query' | 'cookie';
 }
 
 export interface ToolInput {

@@ -1,12 +1,9 @@
 {
   "swagger": {
-    "url": "https://petstore.swagger.io/v2/swagger.json",
-    "apiBaseUrl": "https://petstore.swagger.io/v2",
+    "url": "http://localhost:9000/api-json",
+    "apiBaseUrl": "http://localhost:9000",
     "defaultAuth": {
-      "type": "apiKey",
-      "apiKey": "special-key",
-      "apiKeyName": "api_key",
-      "apiKeyIn": "header"
+      "type": "cookie"
     }
   },
   "log": {

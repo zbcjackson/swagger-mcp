@@ -8,7 +8,7 @@ export const ConfigSchema = z.object({
     url: z.string().url(),
     apiBaseUrl: z.string().url(),
     defaultAuth: z.object({
-      type: z.enum(['basic', 'bearer', 'apiKey', 'oauth2']),
+      type: z.enum(['basic', 'bearer', 'apiKey', 'oauth2', 'cookie']),
       token: z.string().optional(),
       username: z.string().optional(),
       password: z.string().optional(),

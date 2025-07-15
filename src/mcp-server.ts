@@ -1,7 +1,7 @@
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import axios from "axios";
+import axios, {AxiosInstance} from "axios";
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { OpenAPI } from "openapi-types";
 import { Request, Response } from 'express';
@@ -15,6 +15,8 @@ export class SwaggerMcpServer {
   private apiBaseUrl: string;
   private defaultAuth: AuthConfig | undefined;
   private securitySchemes: Record<string, SecurityScheme> = {};
+  private axios: AxiosInstance;
+  private cookie: string | undefined;
 
   constructor(apiBaseUrl: string, defaultAuth?: AuthConfig) {
     console.debug('constructor', apiBaseUrl, defaultAuth);
@@ -31,6 +33,17 @@ export class SwaggerMcpServer {
     }, async ({ input }) => {
       return { content: [{ type: "text", text: "Hello, world!" }] };
     });
+    this.axios = axios.create({withCredentials: true, adapter: "fetch"});
+    this.axios.interceptors.response.use(
+        (response) => {
+          const cookie = response.headers["set-cookie"] as unknown as string;
+          if (cookie) {
+            this.cookie = cookie;
+          }
+          return response;
+        },
+        (error) => Promise.reject(error),
+    );
   }
 
   private getAuthHeaders(auth?: AuthConfig, operation?: OpenAPI.Operation): Record<string, string> {
@@ -43,6 +56,11 @@ export class SwaggerMcpServer {
     if (requiredSchemes.length === 0) return {};
 
     switch (authConfig.type) {
+      case 'cookie':
+        if (this.cookie) {
+          return { 'Cookie': this.cookie! };
+        }
+        break;
       case 'basic':
         if (authConfig.username && authConfig.password) {
           const credentials = Buffer.from(`${authConfig.username}:${authConfig.password}`).toString('base64');
@@ -316,7 +334,7 @@ export class SwaggerMcpServer {
               console.debug('params', params);
               console.debug('queryParams', queryParams);
               
-              const response = await axios({
+              const response = await this.axios({
                 method: method as string,
                 url: url,
                 headers,
