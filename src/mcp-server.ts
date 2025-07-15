@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import axios, {AxiosInstance} from "axios";
 import SwaggerParser from "@apidevtools/swagger-parser";
-import { OpenAPI } from "openapi-types";
+import {OpenAPI, OpenAPIV3 } from "openapi-types";
 import { Request, Response } from 'express';
 import { AuthConfig, ToolInput, SecurityScheme } from './types.js';
 
@@ -51,9 +51,9 @@ export class SwaggerMcpServer {
     const authConfig = auth || this.defaultAuth;
     if (!authConfig) return {};
 
-    // Check if operation requires specific security
-    const requiredSchemes = operation?.security || (this.swaggerSpec as any)?.security || [];
-    if (requiredSchemes.length === 0) return {};
+    // // Check if operation requires specific security
+    // const requiredSchemes = operation?.security || (this.swaggerSpec as any)?.security || [];
+    // if (requiredSchemes.length === 0) return {};
 
     switch (authConfig.type) {
       case 'cookie':
@@ -220,32 +220,52 @@ export class SwaggerMcpServer {
     }
   }
 
-  private createZodSchema(parameter: OpenAPI.Parameter): z.ZodType<any> {
+  private createZodSchema(parameter: OpenAPI.Parameter | OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject ): z.ZodType {
     const schema = (parameter as any).schema || parameter;
-    
+    if (schema.$ref) {
+        const ref = schema.$ref as string;
+        const refParts = ref.replace(/^#\//, '').split('/');
+        const resolvedSchema = refParts.reduce((obj: any, key) => obj[key], this.swaggerSpec!) as OpenAPIV3.SchemaObject;
+        return this.createZodSchema(resolvedSchema);
+    }
+
+    let zodSchema: z.ZodType;
     switch (schema.type) {
       case 'string':
-        return z.string().describe(schema.description || '');
+        zodSchema = z.string().describe(schema.description || '');
+        break;
       case 'number':
-        return z.number().describe(schema.description || '');
+        zodSchema = z.number().describe(schema.description || '');
+        break;
       case 'integer':
-        return z.number().int().describe(schema.description || '');
+        zodSchema =  z.number().int().describe(schema.description || '');
+        break;
       case 'boolean':
-        return z.boolean().describe(schema.description || '');
+        zodSchema = z.boolean().describe(schema.description || '');
+        break;
       case 'array':
-        return z.array(this.createZodSchema(schema.items)).describe(schema.description || '');
+        zodSchema = z.array(this.createZodSchema(schema.items)).describe(schema.description || '');
+        break;
       case 'object':
         if (schema.properties) {
           const shape: { [key: string]: z.ZodType<any> } = {};
           Object.entries(schema.properties).forEach(([key, prop]) => {
             shape[key] = this.createZodSchema(prop as OpenAPI.Parameter);
           });
-          return z.object(shape).describe(schema.description || '');
+          zodSchema = z.object(shape).describe(schema.description || '');
+        } else {
+
+          zodSchema = z.object({}).describe(schema.description || '');
         }
-        return z.object({}).describe(schema.description || '');
+        break;
       default:
-        return z.any().describe(schema.description || '');
+        zodSchema =  z.any().describe(schema.description || '');
+        break;
     }
+    if (!schema.required) {
+      zodSchema = zodSchema.optional();
+    }
+    return zodSchema;
   }
 
   private async registerTools() {
@@ -273,6 +293,10 @@ export class SwaggerMcpServer {
 
         // Add auth parameters based on security schemes
         inputShape['auth'] = this.createAuthSchema(op);
+        const requestBody = (operation as OpenAPIV3.OperationObject).requestBody as OpenAPIV3.RequestBodyObject
+        if (['post', 'put', 'patch'].includes(method) && requestBody) {
+          inputShape['requestBody'] = this.createZodSchema(requestBody.content?.['application/json']?.schema || {});
+        }
 
         // Add API parameters
         parameters.forEach((param) => {
@@ -299,7 +323,7 @@ export class SwaggerMcpServer {
               hasAuth: !!input.auth
             });
             try {
-              const { auth, ...params } = input as ToolInput;
+              const { auth, requestBody, ...params } = input as ToolInput;
               console.debug('params', params);
               let url = this.apiBaseUrl + path;
               
@@ -325,20 +349,21 @@ export class SwaggerMcpServer {
                   .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
                 : {};
 
-              const headers = this.getAuthHeaders(auth, op);
+              const headers = this.getAuthHeaders();
               const queryParams = this.getAuthQueryParams(auth);
 
               console.debug('url', url);
               console.debug('method', method);
               console.debug('headers', headers);
               console.debug('params', params);
+              console.debug('requestBody', requestBody);
               console.debug('queryParams', queryParams);
               
               const response = await this.axios({
                 method: method as string,
                 url: url,
                 headers,
-                data: method !== 'get' ? params : undefined,
+                data: method !== 'get' ? requestBody : undefined,
                 params: { ...queryObject, ...queryParams },
                 paramsSerializer: (params) => {
                   const searchParams = new URLSearchParams();
