@@ -349,7 +349,7 @@ export class SwaggerMcpServer {
                   .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
                 : {};
 
-              const headers = this.getAuthHeaders();
+              const headers = {...this.getAuthHeaders(), ...(['post', 'put', 'patch'].includes(method) ? { 'Content-Type': 'application/json' } : {})};
               const queryParams = this.getAuthQueryParams(auth);
 
               console.debug('url', url);
